@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ETL Project Dashboard</title>
+  <style>
+    body { font-family: Arial; background: #101820; color: #f2f2f2; text-align: center; }
+    .container { margin: 50px auto; width: 60%; }
+    input, button { padding: 10px; margin: 5px; border-radius: 8px; border: none; }
+    button { background: #00aaff; color: white; cursor: pointer; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { padding: 8px; border: 1px solid #333; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    {% if not session.username %}
+      <h2>Login</h2>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <form method="POST" action="/login">
+        <input type="text" name="username" placeholder="Username" required><br>
+        <input type="password" name="password" placeholder="Password" required><br>
+        <button type="submit">Login</button>
+      </form>
+    {% else %}
+      <h2>Welcome, {{ session.username }}</h2>
+      <form id="txForm">
+        <input type="text" id="account_id" placeholder="Enter Account ID" required>
+        <button type="submit">Fetch Transactions</button>
+      </form>
+      <table id="txTable">
+        <thead><tr><th>ID</th><th>Date</th><th>Type</th><th>Amount</th><th>Balance</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <br><a href="/logout">Logout</a>
+      <script>
+        document.getElementById("txForm").onsubmit = async (e) => {
+          e.preventDefault();
+          const id = document.getElementById("account_id").value;
+          const res = await fetch("/api/transactions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account_id: id })
+          });
+          const data = await res.json();
+          const tbody = document.querySelector("#txTable tbody");
+          tbody.innerHTML = "";
+          (data.transactions || []).forEach(t => {
+            const row = `<tr>
+              <td>${t.transactionid || ""}</td>
+              <td>${t.transaction_date || ""}</td>
+              <td>${t.transaction_type || ""}</td>
+              <td>${t.transaction_amount || ""}</td>
+              <td>${t.account_balance_after_transaction || ""}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+          });
+        };
+      </script>
+    {% endif %}
+  </div>
+</body>
+</html>
