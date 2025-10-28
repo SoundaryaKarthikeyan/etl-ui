@@ -2,18 +2,29 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import boto3
 import pandas as pd
 from pycognito import Cognito
+import hmac, hashlib, base64
 
 app = Flask(__name__)
-app.secret_key = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"  # Replace for production
+app.secret_key = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"
 
 # --- AWS Config ---
 REGION = "eu-north-1"
-USER_POOL_ID = "eu-north-1_vHEU8wBW9"  # Replace
-CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"     # Replace
+USER_POOL_ID = "eu-north-1_vHEU8wBW9"
+CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"
+CLIENT_SECRET = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"  # Add your app client secret here
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
 
 s3 = boto3.client("s3", region_name=REGION)
+
+def get_secret_hash(username):
+    msg = username + CLIENT_ID
+    dig = hmac.new(
+        CLIENT_SECRET.encode("utf-8"),
+        msg.encode("utf-8"),
+        digestmod=hashlib.sha256
+    ).digest()
+    return base64.b64encode(dig).decode()
 
 def get_transactions(account_id):
     obj = s3.get_object(Bucket=S3_BUCKET, Key=TRANSACTIONS_KEY)
@@ -33,8 +44,13 @@ def login_page():
         username = request.form["username"]
         password = request.form["password"]
         try:
-            user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
-            user.authenticate(password=password)
+            user = Cognito(
+                USER_POOL_ID, 
+                CLIENT_ID, 
+                username=username, 
+                client_secret=CLIENT_SECRET
+            )
+            user.authenticate(password=password, secret_hash=get_secret_hash(username))
             session["username"] = username
             session["token"] = user.access_token
             return redirect(url_for("home"))
@@ -60,5 +76,3 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
-
