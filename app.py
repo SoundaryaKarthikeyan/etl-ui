@@ -2,36 +2,27 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import boto3
 import pandas as pd
 from pycognito import Cognito
-import hmac, hashlib, base64
 
 app = Flask(__name__)
-app.secret_key = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"
+app.secret_key = "supersecretkey123456"  # Replace with a strong secret in production
 
 # --- AWS Config ---
 REGION = "eu-north-1"
-USER_POOL_ID = "eu-north-1_vHEU8wBW9"
-CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"
-CLIENT_SECRET = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"  # Add your app client secret here
+USER_POOL_ID = "eu-north-1_vHEU8wBW9"  # Your user pool
+CLIENT_ID = "YOUR_NEW_APP_CLIENT_ID_NO_SECRET"  # App client WITHOUT secret
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
 
 s3 = boto3.client("s3", region_name=REGION)
 
-def get_secret_hash(username):
-    msg = username + CLIENT_ID
-    dig = hmac.new(
-        CLIENT_SECRET.encode("utf-8"),
-        msg.encode("utf-8"),
-        digestmod=hashlib.sha256
-    ).digest()
-    return base64.b64encode(dig).decode()
-
+# --- Fetch transactions from CSV ---
 def get_transactions(account_id):
     obj = s3.get_object(Bucket=S3_BUCKET, Key=TRANSACTIONS_KEY)
     df = pd.read_csv(obj["Body"])
     df = df[df["customer_id"].astype(str) == str(account_id)]
     return df.to_dict(orient="records")
 
+# --- Routes ---
 @app.route("/")
 def home():
     if "username" not in session:
@@ -44,13 +35,8 @@ def login_page():
         username = request.form["username"]
         password = request.form["password"]
         try:
-            user = Cognito(
-                USER_POOL_ID, 
-                CLIENT_ID, 
-                username=username, 
-                client_secret=CLIENT_SECRET
-            )
-            user.authenticate(password=password, secret_hash=get_secret_hash(username))
+            user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
+            user.authenticate(password=password)  # No secret_hash needed
             session["username"] = username
             session["token"] = user.access_token
             return redirect(url_for("home"))
