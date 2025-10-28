@@ -9,7 +9,7 @@ app.secret_key = "supersecretkey123456"  # Replace with a strong secret in produ
 # --- AWS Config ---
 REGION = "eu-north-1"
 USER_POOL_ID = "eu-north-1_vHEU8wBW9"  # Your user pool
-CLIENT_ID = "YOUR_NEW_APP_CLIENT_ID_NO_SECRET"  # App client WITHOUT secret
+CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"  # App client WITHOUT secret
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
 
@@ -62,3 +62,4 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+
