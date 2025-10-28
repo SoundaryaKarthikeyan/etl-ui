@@ -4,7 +4,7 @@ import pandas as pd
 from pycognito import Cognito
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Replace for production
+app.secret_key = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"  # Replace for production
 
 # --- AWS Config ---
 REGION = "eu-north-1"
@@ -60,4 +60,5 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+
 
