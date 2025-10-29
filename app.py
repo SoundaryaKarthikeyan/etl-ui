@@ -9,7 +9,8 @@ app.secret_key = "supersecretkey123456"  # Replace with a strong secret in produ
 # --- AWS Config ---
 REGION = "eu-north-1"
 USER_POOL_ID = "eu-north-1_vHEU8wBW9"
-CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"  # App client WITHOUT secret
+CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"
+CLIENT_SECRET = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"   # ← Add this from AWS Cognito Console
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
 
@@ -36,30 +37,24 @@ def login_page():
         password = request.form["password"]
 
         try:
-            # Initialize Cognito user
-            user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
+            # Initialize Cognito user WITH client secret
+            user = Cognito(
+                USER_POOL_ID,
+                CLIENT_ID,
+                client_secret=CLIENT_SECRET,   # important line
+                username=username
+            )
 
             # Authenticate user
-            # (pycognito 2024+ doesn’t take secret_hash argument directly)
             user.authenticate(password=password)
 
-            # Store session tokens
+            # Save tokens in session
             session["username"] = username
             session["token"] = user.access_token
 
             return redirect(url_for("home"))
-        except TypeError as e:
-            # Handle possible old-version mismatch gracefully
-            if "secret_hash" in str(e):
-                # Try again without secret_hash
-                user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
-                user.authenticate(password=password)
-                session["username"] = username
-                session["token"] = user.access_token
-                return redirect(url_for("home"))
-            return render_template("index.html", error="Authentication error: " + str(e))
         except Exception as e:
-            return render_template("index.html", error="Login failed: " + str(e))
+            return render_template("index.html", error=f"Login failed: {e}")
 
     return render_template("index.html")
 
