@@ -18,13 +18,8 @@ TRANSACTIONS_KEY = "processed/transactions.csv"
 # AWS client
 s3 = boto3.client("s3", region_name=REGION)
 
-# Check if file exists in S3
-response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=TRANSACTIONS_KEY)
-print(response)
-
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-
 
 # --- Fetch transactions from CSV ---
 def get_transactions(account_id):
@@ -39,22 +34,25 @@ def get_transactions(account_id):
         logging.info(f"CSV Columns: {df.columns.tolist()}")
         logging.info(f"Sample data:\n{df.head(3)}")
 
-        # Ensure customer_id is integer for proper comparison
+        # Safely convert customer_id to integer
+        df["customer_id"] = pd.to_numeric(df["customer_id"], errors="coerce")  # invalid -> NaN
+        df = df.dropna(subset=["customer_id"])  # remove NaN rows
         df["customer_id"] = df["customer_id"].astype(int)
+
         account_id_int = int(account_id)
 
         logging.info(f"Account ID (int): {account_id_int}")
-        logging.info(f"First 5 customer_ids: {df['customer_id'].head().tolist()}")
+        logging.info(f"First 10 customer_ids: {df['customer_id'].unique()[:10]}")
 
         # Filter rows
         filtered = df[df["customer_id"] == account_id_int]
         logging.info(f"Records found: {len(filtered)}")
 
         return filtered.to_dict(orient="records")
+
     except Exception as e:
         logging.error(f"Error fetching transactions: {e}")
         return []
-
 
 # --- Routes ---
 @app.route("/")
