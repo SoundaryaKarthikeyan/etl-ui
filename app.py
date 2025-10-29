@@ -18,6 +18,8 @@ TRANSACTIONS_KEY = "processed/transactions.csv"
 # AWS client
 s3 = boto3.client("s3", region_name=REGION)
 
+response = s3.list_objects_v2(Bucket="etl-project-data-bucket1", Prefix="processed/transactions.csv")
+print(response)
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
@@ -104,3 +106,4 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+
