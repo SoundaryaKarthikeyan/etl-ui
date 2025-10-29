@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import boto3
 import pandas as pd
 from pycognito import Cognito
+import logging
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey123456"  # Replace with a strong secret in production
@@ -10,18 +11,38 @@ app.secret_key = "supersecretkey123456"  # Replace with a strong secret in produ
 REGION = "eu-north-1"
 USER_POOL_ID = "eu-north-1_vHEU8wBW9"
 CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"
-CLIENT_SECRET = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"   # ← Add this from AWS Cognito Console
+CLIENT_SECRET = "tpthiui7bi1ng8pjj4hl6kq0od5bc4mcbk6p590bci7u2f1phhc"
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
 
+# AWS client
 s3 = boto3.client("s3", region_name=REGION)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 
 # --- Fetch transactions from CSV ---
 def get_transactions(account_id):
-    obj = s3.get_object(Bucket=S3_BUCKET, Key=TRANSACTIONS_KEY)
-    df = pd.read_csv(obj["Body"])
-    df = df[df["customer_id"].astype(str) == str(account_id)]
-    return df.to_dict(orient="records")
+    logging.info(f"Fetching transactions for account_id: {account_id}")
+
+    try:
+        obj = s3.get_object(Bucket=S3_BUCKET, Key=TRANSACTIONS_KEY)
+        df = pd.read_csv(obj["Body"])
+
+        # Normalize column names
+        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+
+        logging.info(f"CSV Columns: {df.columns.tolist()}")
+        logging.info(f"Sample data:\n{df.head(3)}")
+
+        # Filter rows
+        filtered = df[df["customer_id"].astype(str) == str(account_id)]
+        logging.info(f"Records found: {len(filtered)}")
+
+        return filtered.to_dict(orient="records")
+    except Exception as e:
+        logging.error(f"Error fetching transactions: {e}")
+        return []
 
 # --- Routes ---
 @app.route("/")
@@ -37,23 +58,23 @@ def login_page():
         password = request.form["password"]
 
         try:
-            # Initialize Cognito user WITH client secret
             user = Cognito(
                 USER_POOL_ID,
                 CLIENT_ID,
-                client_secret=CLIENT_SECRET,   # important line
+                client_secret=CLIENT_SECRET,
                 username=username
             )
 
-            # Authenticate user
+            # Authenticate
             user.authenticate(password=password)
 
-            # Save tokens in session
+            # Save session
             session["username"] = username
             session["token"] = user.access_token
 
             return redirect(url_for("home"))
         except Exception as e:
+            logging.error(f"Login failed: {e}")
             return render_template("index.html", error=f"Login failed: {e}")
 
     return render_template("index.html")
@@ -70,6 +91,10 @@ def api_transactions():
         return jsonify({"error": "Missing account_id"}), 400
 
     tx = get_transactions(account_id)
+
+    if not tx:
+        return jsonify({"message": f"No transactions found for account {account_id}"}), 404
+
     return jsonify({"transactions": tx})
 
 @app.route("/logout")
