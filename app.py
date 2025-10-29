@@ -8,7 +8,7 @@ app.secret_key = "supersecretkey123456"  # Replace with a strong secret in produ
 
 # --- AWS Config ---
 REGION = "eu-north-1"
-USER_POOL_ID = "eu-north-1_vHEU8wBW9"  # Your user pool
+USER_POOL_ID = "eu-north-1_vHEU8wBW9"
 CLIENT_ID = "53jjmqe9kppcrbfadh75pd7092"  # App client WITHOUT secret
 S3_BUCKET = "etl-project-data-bucket1"
 TRANSACTIONS_KEY = "processed/transactions.csv"
@@ -34,24 +34,46 @@ def login_page():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+
         try:
+            # Initialize Cognito user
             user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
-            user.authenticate(password=password)  # No secret_hash needed
+
+            # Authenticate user
+            # (pycognito 2024+ doesn’t take secret_hash argument directly)
+            user.authenticate(password=password)
+
+            # Store session tokens
             session["username"] = username
             session["token"] = user.access_token
+
             return redirect(url_for("home"))
+        except TypeError as e:
+            # Handle possible old-version mismatch gracefully
+            if "secret_hash" in str(e):
+                # Try again without secret_hash
+                user = Cognito(USER_POOL_ID, CLIENT_ID, username=username)
+                user.authenticate(password=password)
+                session["username"] = username
+                session["token"] = user.access_token
+                return redirect(url_for("home"))
+            return render_template("index.html", error="Authentication error: " + str(e))
         except Exception as e:
-            return render_template("index.html", error=str(e))
+            return render_template("index.html", error="Login failed: " + str(e))
+
     return render_template("index.html")
 
 @app.route("/api/transactions", methods=["POST"])
 def api_transactions():
     if "username" not in session:
         return jsonify({"error": "Unauthorized"}), 401
+
     data = request.get_json()
     account_id = data.get("account_id")
+
     if not account_id:
         return jsonify({"error": "Missing account_id"}), 400
+
     tx = get_transactions(account_id)
     return jsonify({"transactions": tx})
 
@@ -62,4 +84,3 @@ def logout():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
