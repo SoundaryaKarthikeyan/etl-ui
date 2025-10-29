@@ -18,15 +18,17 @@ TRANSACTIONS_KEY = "processed/transactions.csv"
 # AWS client
 s3 = boto3.client("s3", region_name=REGION)
 
-response = s3.list_objects_v2(Bucket="etl-project-data-bucket1", Prefix="processed/transactions.csv")
+# Check if file exists in S3
+response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=TRANSACTIONS_KEY)
 print(response)
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
+
 
 # --- Fetch transactions from CSV ---
 def get_transactions(account_id):
     logging.info(f"Fetching transactions for account_id: {account_id}")
-
     try:
         obj = s3.get_object(Bucket=S3_BUCKET, Key=TRANSACTIONS_KEY)
         df = pd.read_csv(obj["Body"])
@@ -37,8 +39,15 @@ def get_transactions(account_id):
         logging.info(f"CSV Columns: {df.columns.tolist()}")
         logging.info(f"Sample data:\n{df.head(3)}")
 
+        # Ensure customer_id is integer for proper comparison
+        df["customer_id"] = df["customer_id"].astype(int)
+        account_id_int = int(account_id)
+
+        logging.info(f"Account ID (int): {account_id_int}")
+        logging.info(f"First 5 customer_ids: {df['customer_id'].head().tolist()}")
+
         # Filter rows
-        filtered = df[df["customer_id"].astype(str) == str(account_id)]
+        filtered = df[df["customer_id"] == account_id_int]
         logging.info(f"Records found: {len(filtered)}")
 
         return filtered.to_dict(orient="records")
@@ -46,12 +55,14 @@ def get_transactions(account_id):
         logging.error(f"Error fetching transactions: {e}")
         return []
 
+
 # --- Routes ---
 @app.route("/")
 def home():
     if "username" not in session:
         return redirect(url_for("login_page"))
     return render_template("index.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login_page():
@@ -81,6 +92,7 @@ def login_page():
 
     return render_template("index.html")
 
+
 @app.route("/api/transactions", methods=["POST"])
 def api_transactions():
     if "username" not in session:
@@ -99,11 +111,12 @@ def api_transactions():
 
     return jsonify({"transactions": tx})
 
+
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
-
